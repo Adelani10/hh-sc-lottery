@@ -36,7 +36,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
         describe("enterRaffle", function () {
             it("reverts when you don't pay enough", async () => {
                 await expect(raffle.enterRaffle()).to.be.revertedWith( // is reverted when not paid enough or raffle is not open
-                    "Raffle__SendMoreToEnterRaffle"
+                    "Raffle__NotEnoughETHEntered"
                 )
             })
 
@@ -57,11 +57,12 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                 await raffle.enterRaffle({ value: raffleEntranceFee })
                 // for a documentation of the methods below, go here: https://hardhat.org/hardhat-network/reference
                 await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-                await network.provider.request({ method: "evm_mine", params: [] })
+                // await network.provider.request({ method: "evm_mine", params: [] })
+                await network.provider.send("evm_mine", [])
                 // we pretend to be a keeper for a second
                 await raffle.performUpkeep([]) // changes the state to calculating for our comparison below
                 await expect(raffle.enterRaffle({ value: raffleEntranceFee })).to.be.revertedWith( // is reverted as raffle is calculating
-                    "Raffle__RaffleNotOpen"
+                    "Raffle__NotOpen"
                 )
             })
         })
@@ -154,7 +155,8 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
             it("picks a winner, resets, and sends money", async () => {
                 const additionalEntrances = 3 // to test
-                const startingIndex = 2
+                const startingIndex = 1
+                const accounts = await ethers.getSigners()
                 for (let i = startingIndex; i < startingIndex + additionalEntrances; i++) { // i = 2; i < 5; i=i+1
                     raffle = raffleContract.connect(accounts[i]) // Returns a new instance of the Raffle contract connected to player
                     await raffle.enterRaffle({ value: raffleEntranceFee })
@@ -173,19 +175,19 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                             // Now lets get the ending values...
                             const recentWinner = await raffle.getRecentWinner()
                             const raffleState = await raffle.getRaffleState()
-                            const winnerBalance = await accounts[2].getBalance()
+                            const winnerBalance = await accounts[1].getBalance()
                             const endingTimeStamp = await raffle.getLastTimeStamp()
                             await expect(raffle.getPlayer(0)).to.be.reverted
                             // Comparisons to check if our ending values are correct:
-                            assert.equal(recentWinner.toString(), accounts[2].address)
-                            assert.equal(raffleState, 0)
+                            assert.equal(recentWinner.toString(), accounts[1].address)
+                            assert.equal(raffleState.toString(), "0")
                             assert.equal(
                                 winnerBalance.toString(), 
                                 startingBalance // startingBalance + ( (raffleEntranceFee * additionalEntrances) + raffleEntranceFee )
                                     .add(
                                         raffleEntranceFee
                                             .mul(additionalEntrances)
-                                            .add(raffleEntranceFee)
+                                            .add(raffleEntranceFee).toString()
                                     )
                                     .toString()
                             )
@@ -194,15 +196,18 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                         } catch (e) {
                             reject(e)
                         }
-                        // kicking off the event by mocking the chainlink keepers and vrf coordinator
-                        const tx = await raffle.performUpkeep("0x")
-                        const txReceipt = await tx.wait(1)
-                        const startingBalance = await accounts[2].getBalance()
-                        await vrfCoordinatorV2Mock.fulfillRandomWords(
-                            txReceipt.events[1].args.requestId,
-                            raffle.address
-                        )
+    
                     })
+
+                    // kicking off the event by mocking the chainlink keepers and vrf coordinator
+                    const tx = await raffle.performUpkeep("0x")
+                    const txReceipt = await tx.wait(1)
+                    const startingBalance = await accounts[1].getBalance()
+                    await vrfCoordinatorV2Mock.fulfillRandomWords(
+                        txReceipt.events[1].args.requestId,
+                        raffle.address
+                    )
+
                 })
             })
         })

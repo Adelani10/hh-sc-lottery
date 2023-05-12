@@ -42,10 +42,37 @@ module.exports = {
       chainId: 11155111,
       blockConfirmations: 6,
       url: SEPOLIA_RPC_URL,
-      accounts: [PRIVATE_KEY]
+      accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
     }
   },
-  solidity: "0.8.7",
+  etherscan: {
+        // yarn hardhat verify --network <NETWORK> <CONTRACT_ADDRESS> <CONSTRUCTOR_PARAMETERS>
+        apiKey: {
+            sepolia: ETHERSCAN_API_KEY,
+            // polygon: POLYGONSCAN_API_KEY,
+        },
+        customChains: [
+            {
+                network: "goerli",
+                chainId: 5,
+                urls: {
+                    apiURL: "https://api-goerli.etherscan.io/api",
+                    browserURL: "https://goerli.etherscan.io",
+                },
+            },
+        ],
+  },
+  gasReporter: {
+        // enabled: REPORT_GAS,
+        currency: "USD",
+        outputFile: "gas-report.txt",
+        noColors: true,
+        // coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+    },
+  contractSizer: {
+      runOnCompile: false,
+      only: ["Raffle"],
+  },
   namedAccounts: {
     deployer: {
       default: 0,
